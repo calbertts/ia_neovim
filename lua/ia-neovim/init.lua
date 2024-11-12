@@ -244,7 +244,7 @@ local function append_lines_and_move_cursor(response)
     end
 
     remove_backticks_from_buffer(buf)
-    remove_single_backticks(buf)
+    --remove_single_backticks(buf)
 
 
 
