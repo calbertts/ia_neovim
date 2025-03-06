@@ -1,4 +1,5 @@
 local ia_neovim = {}
+--local crypto = require('crypto')
 
 local function escape_for_json(s)
     s = s:gsub('\\', '\\\\\\')   -- Escape backslashes
@@ -299,34 +300,113 @@ function Test()
 end
 
 function ia_neovim.AzureFunctionCall()
+  vim.notify("Generatig...", vim.log.levels.INFO)
   -- Get the text of the current buffer
   local buffer_content = vim.api.nvim_buf_get_lines(0, 0, -1, false)
   local complete_text = table.concat(buffer_content, "\n")
   local full_text = escape_for_json(complete_text)
+
+  local encrypted_data = ia_neovim.encrypt(full_text)
   
   -- Replace `your_function_url_here` with your actual Azure Function endpoint
   local azure_function_url = os.getenv("IA_NEOVIM_FUNC_URL")
   local azure_function_key = os.getenv("IA_NEOVIM_FUNC_KEY")
   
   -- Prepare the curl command
+  -- local curl_command = string.format(
+  --  'curl -s -X POST -H "Content-Type: application/json" -d \'{"question": "%s"}\' %s?code=%s',
+  --  encrypted_data,
+  --  azure_function_url,
+  --  azure_function_key
+  --)
+
+  local body = {
+    question = encrypted_data
+  }
+
+  -- store body in a tmp file
+  local json_data = vim.fn.json_encode(body)
+
+  -- write the json data to a temp file
+  local tmp_file = vim.fn.tempname()
+  local file = io.open(tmp_file, "w")
+  file:write(json_data)
+  file:close()
+
+  -- Prepare the curl curl_command
   local curl_command = string.format(
-    'curl -s -X POST -H "Content-Type: application/json" -d \'{"question": "%s"}\' %s?code=%s',
-    full_text,  -- Escape single quotes in the text
+    'curl -s -X POST -H "Content-Type: application/json" --data-binary @%s %s?code=%s',
+    tmp_file,
     azure_function_url,
     azure_function_key
   )
 
-  --print(curl_command)
+  --add curl command to the buffer
+  --vim.api.nvim_buf_set_lines(0, 0, -1, false, {curl_command})
+
+  vim.notify("Printing...", vim.log.levels.INFO)
 
   -- Call the Azure function using curl
   local response = vim.fn.system(curl_command)
-  --print(response)
 
   -- Open a new line and insert the response
   append_lines_and_move_cursor(response)
+
+  -- print silently
+  vim.notify("Done.", vim.log.levels.INFO)
+end
+
+function ia_neovim.getKey()
+  -- Replace our_function_url_her with your actual Azure Function endpoint
+  local azure_function_url = os.getenv("IA_KEY_NEOVIM_FUNC_URL")
+  local azure_function_key = os.getenv("IA_KEY_NEOVIM_FUNC_KEY")
+
+  -- Prepare the curl command, just GET
+  local curl_command = string.format(
+    'curl -s -X GET %s?code=%s',
+    azure_function_url,
+    azure_function_key
+  )
+
+  -- collect the response in a string
+  local response = vim.fn.system(curl_command)
+  print(response)
+
+  return response
+end
+
+local b='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+local function base64_encode(data)
+    return ((data:gsub('.', function(x) 
+        local r,b='',x:byte()
+        for i=8,1,-1 do r=r..(b%2^i-b%2^(i-1)>0 and '1' or '0') end
+        return r;
+    end)..'0000'):gsub('%d%d%d?%d?%d?%d?', function(x)
+        if (#x < 6) then return '' end
+        local c=0
+        for i=1,6 do c=c+(x:sub(i,i)=='1' and 2^(6-i) or 0) end
+        return b:sub(c+1,c+1)
+    end)..({ '', '==', '=' })[#data%3+1])
+end
+
+function ia_neovim.encrypt(body)
+    local key = ia_neovim.getKey()
+    --local iv = crypto.random(16)
+
+    -- Create a new AES cipher
+    --local cipher = crypto.encrypt.new('aes-256-cbc', key)
+
+    -- Encrypt the data
+    --local encrypted = cipher:final(body, 'base64', iv)
+
+    -- Return the base64 encoded string
+    local encoded = base64_encode(body)
+    return encoded
 end
 
 function ia_neovim.AzureFunctionCall2()
+  --print in the buffer
+  vim.api.nvim_buf_set_lines(0, 0, -1, false, { "Hello, world!" })
   -- Get the text of the current buffer
   local buffer_content = vim.api.nvim_buf_get_lines(0, 0, -1, false)
   local complete_text = table.concat(buffer_content, "\n")
@@ -348,10 +428,13 @@ function ia_neovim.AzureFunctionCall2()
     end
   end
 
+  -- Encrypt the JSON data using the generated key
+  local encrypted_data = ia_neovim.encrypt(full_text)
+
   -- Prepare the curl command
   local curl_command = string.format(
     'curl -s -X POST -H "Content-Type: application/json" -d \'{"question": "%s"}\' %s?code=%s',
-    vim.fn.escape(full_text, "'"),
+    encrypted_data,
     azure_function_url,
     azure_function_key
   )
