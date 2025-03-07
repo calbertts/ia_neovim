@@ -272,7 +272,7 @@ function ia_neovim.AzureFunctionCall()
   local azure_function_key = os.getenv("IA_NEOVIM_FUNC_KEY")
   
   local body = {
-    question = encrypted_data
+    question = encrypted_data,
     files = ia_neovim.retrieveBuffersContent()
   }
 
