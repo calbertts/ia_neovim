@@ -247,12 +247,28 @@ function ia_neovim.retrieveBuffersContent()
 
   for _, bufnr in ipairs(buffers) do
     local buffer_name = vim.api.nvim_buf_get_name(bufnr)
+
+    if buffer_name == "" then
+      goto continue
+    end
+    
     local buffer_content = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+    local complete_text = table.concat(buffer_content, "\n")
+
+    -- Skip iteration if buffer name is empty
+    if complete_text == "" then
+      goto continue
+    end
+
+    -- Convert buffer content to one string
+    local encoded = ia_neovim.encrypt(complete_text)
 
     table.insert(buffers_content, {
-      name = buffer_name,
-      content = buffer_content
+      name = ia_neovim.encrypt(buffer_name),
+      content = encoded
     })
+
+    ::continue::
   end
 
   return buffers_content
@@ -272,8 +288,8 @@ function ia_neovim.AzureFunctionCall()
   local azure_function_key = os.getenv("IA_NEOVIM_FUNC_KEY")
   
   local body = {
-    question = encrypted_data,
-    files = ia_neovim.retrieveBuffersContent()
+    q = encrypted_data,
+    f = ia_neovim.retrieveBuffersContent()
   }
 
   -- store body in a tmp file
